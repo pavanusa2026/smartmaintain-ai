@@ -1,0 +1,17 @@
+version: 1.0
+runtime: python312
+build:
+  commands:
+    pre-build:
+      - chmod +x scripts/apprunner-build.sh
+    build:
+      - bash scripts/apprunner-build.sh
+run:
+  command: sh -c "cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"
+  network:
+    port: 8080
+  env:
+    - name: DEBUG
+      value: "false"
+    - name: SEED_DEMO_DATA
+      value: "true"
