@@ -9,8 +9,8 @@ NODE_DIR="node-${NODE_VERSION}-linux-x64"
 
 if ! command -v node >/dev/null 2>&1; then
   echo "Installing Node.js ${NODE_VERSION}..."
-  curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/${NODE_DIR}.tar.xz" -o /tmp/node.tar.xz
-  tar -xJf /tmp/node.tar.xz -C /tmp
+  curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/${NODE_DIR}.tar.gz" -o /tmp/node.tar.gz
+  tar -xzf /tmp/node.tar.gz -C /tmp
   export PATH="/tmp/${NODE_DIR}/bin:$PATH"
 fi
 
