@@ -9,9 +9,15 @@ import traceback
 def main() -> None:
     root = os.path.dirname(os.path.abspath(__file__))
     backend = os.path.join(root, "backend")
-    os.chdir(backend)
-    if backend not in sys.path:
-        sys.path.insert(0, backend)
+
+    if os.path.isdir(backend):
+        os.chdir(backend)
+        if backend not in sys.path:
+            sys.path.insert(0, backend)
+    else:
+        os.chdir(root)
+        if root not in sys.path:
+            sys.path.insert(0, root)
 
     port = int(os.getenv("PORT", "8080"))
     print(f"[startup] cwd={os.getcwd()} port={port}", flush=True)
