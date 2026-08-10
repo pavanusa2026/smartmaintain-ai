@@ -1,15 +1,15 @@
 """Local ML prediction service using scikit-learn."""
 
 import logging
-import math
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Optional
-
-import numpy as np
-from sklearn.ensemble import IsolationForest, RandomForestClassifier
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any
 
 from app.core.config import get_settings
+
+if TYPE_CHECKING:
+    import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,14 @@ FAILURE_TYPES = {
 }
 
 
-def _extract_features(readings: list[dict], machine_type: str = "motor") -> np.ndarray:
+def _numpy():
+    import numpy as np
+
+    return np
+
+
+def _extract_features(readings: list[dict], machine_type: str = "motor") -> "np.ndarray":
+    np = _numpy()
     if not readings:
         baseline = BASELINES.get(machine_type, BASELINES["other"])
         return np.array(
@@ -94,12 +101,16 @@ class LocalModelPredictionService(PredictionService):
     """Uses statistical models trained on synthetic data at startup."""
 
     def __init__(self) -> None:
+        from sklearn.ensemble import IsolationForest, RandomForestClassifier
+
         self.settings = get_settings()
+        self._np = _numpy()
         self._anomaly_model = IsolationForest(contamination=0.1, random_state=42)
         self._failure_model = RandomForestClassifier(n_estimators=50, random_state=42)
         self._train_synthetic_models()
 
     def _train_synthetic_models(self) -> None:
+        np = self._np
         rng = np.random.default_rng(42)
         n = 500
         X_normal = rng.normal(0, 0.3, (n, 9))
@@ -118,6 +129,7 @@ class LocalModelPredictionService(PredictionService):
     def predict(
         self, machine_id: str, readings: list[dict], machine_type: str = "motor", operating_hours: float = 0
     ) -> dict:
+        np = self._np
         features = _extract_features(readings, machine_type)
         baseline = BASELINES.get(machine_type, BASELINES["other"])
 
@@ -253,6 +265,7 @@ class SageMakerPredictionService(PredictionService):
             return fallback
 
 
+@lru_cache
 def get_prediction_service() -> PredictionService:
     settings = get_settings()
     if settings.use_local_model or not settings.sagemaker_endpoint:

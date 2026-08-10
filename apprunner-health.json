@@ -2,7 +2,7 @@
   "Protocol": "HTTP",
   "Path": "/health",
   "Interval": 10,
-  "Timeout": 5,
+  "Timeout": 10,
   "HealthyThreshold": 1,
-  "UnhealthyThreshold": 5
+  "UnhealthyThreshold": 10
 }

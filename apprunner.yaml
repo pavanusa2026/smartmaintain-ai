@@ -7,7 +7,7 @@ build:
     build:
       - bash scripts/apprunner-build.sh
 run:
-  command: sh -c "cd backend && python3 -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"
+  command: sh -c "cd backend && exec python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8080"
   network:
     port: 8080
   env:
