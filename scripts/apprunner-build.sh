@@ -26,8 +26,4 @@ echo "Copying static assets into backend..."
 mkdir -p "$ROOT/backend/app/static"
 cp -r dist/* "$ROOT/backend/app/static/"
 
-echo "Installing Python dependencies..."
-cd "$ROOT/backend"
-python -m pip install -r requirements.txt
-
 echo "Build complete."
