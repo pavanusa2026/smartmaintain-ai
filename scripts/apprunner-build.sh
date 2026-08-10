@@ -26,4 +26,5 @@ echo "Copying static assets into backend..."
 mkdir -p "$ROOT/backend/app/static"
 cp -r dist/* "$ROOT/backend/app/static/"
 
+echo "Build revision: 4"
 echo "Build complete."
