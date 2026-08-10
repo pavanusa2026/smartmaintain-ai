@@ -15,3 +15,5 @@ run:
       value: "false"
     - name: SEED_DEMO_DATA
       value: "true"
+    - name: LIGHTWEIGHT_PREDICTIONS
+      value: "true"

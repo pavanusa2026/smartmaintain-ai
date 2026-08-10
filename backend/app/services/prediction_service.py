@@ -97,6 +97,77 @@ class PredictionService(ABC):
         pass
 
 
+class RuleBasedPredictionService(PredictionService):
+    """Pure-Python predictions for low-memory deployments (e.g. App Runner free tier)."""
+
+    def __init__(self) -> None:
+        self.settings = get_settings()
+
+    def predict(
+        self, machine_id: str, readings: list[dict], machine_type: str = "motor", operating_hours: float = 0
+    ) -> dict:
+        baseline = BASELINES.get(machine_type, BASELINES["other"])
+        latest = readings[-1] if readings else baseline
+
+        temp = float(latest.get("temperature", baseline["temp"]))
+        vib = float(latest.get("vibration", baseline["vib"]))
+        pressure = float(latest.get("pressure", baseline["pressure"]))
+        power = float(latest.get("powerConsumption", baseline["power"]))
+        speed = float(latest.get("rotationalSpeed", baseline["speed"]))
+        load = float(latest.get("operatingLoad", baseline["load"]))
+
+        temp_dev = abs(temp - baseline["temp"]) / max(baseline["temp"], 1)
+        vib_dev = abs(vib - baseline["vib"]) / max(baseline["vib"], 1)
+        pressure_dev = abs(pressure - baseline["pressure"]) / max(baseline["pressure"], 1)
+        power_dev = abs(power - baseline["power"]) / max(baseline["power"], 1)
+        speed_dev = abs(speed - baseline["speed"]) / max(baseline["speed"], 1) if baseline["speed"] else 0
+        load_dev = abs(load - baseline["load"]) / max(baseline["load"], 1)
+
+        anomaly_score = min(0.99, max(temp_dev, vib_dev, pressure_dev) * 0.45)
+        failure_probability = min(
+            0.99,
+            temp_dev * 0.25 + vib_dev * 0.35 + pressure_dev * 0.15 + power_dev * 0.1 + speed_dev * 0.1 + load_dev * 0.05,
+        )
+
+        if len(readings) >= 5:
+            recent_vib = [float(r.get("vibration", 0)) for r in readings[-5:]]
+            vib_trend = recent_vib[-1] - recent_vib[0]
+            if vib_trend > 0.3:
+                failure_probability = min(0.99, failure_probability + vib_trend * 0.15)
+                anomaly_score = min(0.99, anomaly_score + vib_trend * 0.1)
+
+        health_score = max(0, min(100, 100 - failure_probability * 80 - anomaly_score * 20))
+        likely_failure = FAILURE_TYPES.get(machine_type, "general_wear")
+
+        degradation_rate = failure_probability * 0.5 + anomaly_score * 0.3
+        rul_hours = max(24, (1 - degradation_rate) * 500) if degradation_rate < 0.95 else 12
+
+        primary_concern = "Normal operation"
+        recommended = "Continue routine monitoring."
+        if failure_probability > 0.7:
+            primary_concern = likely_failure.replace("_", " ").title()
+            recommended = f"Inspect {primary_concern.lower()} within 24 hours."
+        elif failure_probability > 0.4:
+            primary_concern = "Developing wear pattern"
+            recommended = "Schedule preventive inspection within 7 days."
+
+        return {
+            "machineId": machine_id,
+            "failureProbability": round(failure_probability, 3),
+            "predictionWindowDays": 7,
+            "likelyFailureType": likely_failure,
+            "confidence": round(min(0.99, 0.75 + anomaly_score * 0.2), 3),
+            "healthScore": round(health_score, 1),
+            "anomalyScore": round(anomaly_score, 3),
+            "remainingUsefulLifeHours": round(rul_hours, 1),
+            "modelVersion": f"{self.settings.model_version}-rules",
+            "primaryConcern": primary_concern,
+            "recommendedAction": recommended,
+            "predictionTimestamp": datetime.now(timezone.utc).isoformat(),
+            "valid": True,
+        }
+
+
 class LocalModelPredictionService(PredictionService):
     """Uses statistical models trained on synthetic data at startup."""
 
@@ -234,7 +305,7 @@ class SageMakerPredictionService(PredictionService):
         self.client = boto3.client(
             "sagemaker-runtime", region_name=self.settings.aws_region, config=config
         )
-        self._fallback = LocalModelPredictionService()
+        self._fallback = _get_local_model_service()
 
     def predict(
         self, machine_id: str, readings: list[dict], machine_type: str = "motor", operating_hours: float = 0
@@ -265,9 +336,25 @@ class SageMakerPredictionService(PredictionService):
             return fallback
 
 
+def _sklearn_available() -> bool:
+    try:
+        import sklearn  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
+def _get_local_model_service() -> PredictionService:
+    settings = get_settings()
+    if settings.lightweight_predictions or not _sklearn_available():
+        return RuleBasedPredictionService()
+    return LocalModelPredictionService()
+
+
 @lru_cache
 def get_prediction_service() -> PredictionService:
     settings = get_settings()
     if settings.use_local_model or not settings.sagemaker_endpoint:
-        return LocalModelPredictionService()
+        return _get_local_model_service()
     return SageMakerPredictionService()

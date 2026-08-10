@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     # Static files
     static_dir: str = "app/static"
 
+    # Use lightweight rule-based predictions (no scikit-learn) for constrained hosts
+    lightweight_predictions: bool = False
+
     @field_validator("jwt_secret")
     @classmethod
     def validate_jwt_secret_strength(cls, v: str, info) -> str:
