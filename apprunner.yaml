@@ -17,3 +17,5 @@ run:
       value: "true"
     - name: LIGHTWEIGHT_PREDICTIONS
       value: "true"
+    - name: JWT_SECRET
+      value: "a8f3c2e91b047d6e5f0a9c3b8d7e4f1c6a2b9d0e8f7c4a1b6d3e9f2c5a8b1d4e7f0"
