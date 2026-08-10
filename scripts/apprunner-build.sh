@@ -28,6 +28,6 @@ cp -r dist/* "$ROOT/backend/app/static/"
 
 echo "Installing Python dependencies..."
 cd "$ROOT/backend"
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 
 echo "Build complete."
